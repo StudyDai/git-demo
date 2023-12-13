@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+
+<body>
+    <script>
+        // const p3 = new Promise((resolve, reject) => {
+        //     reject("235")    
+        //     // resolve("123")
+        // }).then(res => {
+        //     console.log(res);
+        // })
+        // setTimeout(() => {
+        //     console.log(p3);   
+        // });
+        // console.log();
+        // console.log(p1)
+        // console.log('%O', Promise.resolve)
+        // setTimeout(() => {
+        //     console.log(p1.then(res => {
+        //         return new Promise((resolve, reject) => {
+        //             resolve({
+        //                 then(resolve) {
+        //                     resolve("obj")
+        //                 }
+        //             })
+        //         })
+        // }))
+        // }, 1000);
+        // console.log(p);
+        // p.then(res => {
+        //     console.log(res);
+        // })
+        class HYPromise {
+            constructor(executor) {
+                // 初始化状态
+                this.status = 'pending'
+                // 初始化成功的值是undefined
+                this.value = undefined
+                // 初始化失败的原因是undefined
+                this.reason = undefined
+                // 初始化成功处理函数队列
+                this.onFulfilledCallbacks = []
+                // 初始化失败处理函数队列
+                this.onRejectedCallbacks = []
+                // 定义resolve方法
+                const resolve = (value) => {
+                    if (this.status == "pending") {
+                        this.status = "fulfilled"
+                        this.value = value
+                        // 执行所有成功函数
+                        this.onFulfilledCallbacks.forEach(callback => callback())
+                    }
+                }
+                // 定义reject方法
+                const reject = (reason) => {
+                    if (this.status == "pending") {
+                        this.status = "rejected"
+                        this.reason = reason
+                        // 执行所有失败处理函数
+                        console.log(this);
+                        if(this.onRejectedCallbacks.length) {
+                            this.onRejectedCallbacks.forEach(callback => callback());
+                        }else{
+                            throw `(in HYPromise) ${this.reason}`
+                        }
+                    }
+                }
+                try {
+                    executor(resolve, reject)
+                } catch (err) {
+                    reject(err)
+                }
+            }
+            // 实现then方法
+            then(onFulfilled, onRejected) {
+                onFulfilled = onFulfilled && (typeof onFulfilled == 'function' ? onFulfilled : (value) => value)
+                onRejected = onRejected && (typeof onRejected == 'function' ? onRejected : reason => {
+                    throw reason
+                })
+                const promise2 = new HYPromise((resolve, reject) => {
+                    if (this.status === "fulfilled") {
+                        setTimeout(() => {
+                            try {
+                                if (this.value !== null && (typeof this.value === 'object' || typeof this.value === 'function')) {
+                                    const then = this.value.then
+                                    if (typeof then == 'function') {
+                                        then.call(this.value, y => this.value = y, reason => this.reason = reason)
+                                    }
+                                }
+                                const x = onFulfilled(this.value)
+                                resolvePromise(promise2, x, resolve, reject)
+                            } catch (err) {
+                                reject(err)
+                            }
+                        });
+                    } else if (this.status === "rejected") {
+                        setTimeout(() => {
+                            // console.log(onRejected);
+                            const x = onRejected(this.reason)
+                        })
+                    } else if (this.status === 'pending') {
+                        if (onFulfilled) {
+                            this.onFulfilledCallbacks.push(() => {
+                                setTimeout(() => {
+                                    try {
+                                        const x = onFulfilled(this.value)
+                                        resolvePromise(promise2, x, resolve, reject)
+                                    } catch (err) {
+                                        reject(err)
+                                    }
+                                });
+                            })
+                        }
+                        if (onRejected) {
+                            this.onRejectedCallbacks.push(() => {
+                                setTimeout(() => {
+                                    const x = onRejected(this.reason)
+                                    resolvePromise(promise2, x, resolve, reject)
+                                });
+                            })
+                        }
+                    }
+                })
+                return promise2
+            }
+
+            // catch方法
+            catch(rejectCallback) {
+                setTimeout(() => {
+                    return this.then(null, rejectCallback)
+                });
+            }
+        }
+        function resolvePromise(promise2, x, resolve, reject) {
+            if (promise2 == x) {
+                return reject(new TypeError('chaining cycle detected for promise'))
+            }
+            let called = false
+            // 如果x是HYpromise的实例
+            if (x instanceof HYPromise) {
+                x.then(y => { resolvePromise(promise2, y, resolve, reject) }, reason => {
+                    reject(reason)
+                })
+            } else if (x !== null && (typeof x === 'object' || typeof x === 'function')) {
+                try {
+                    const then = x.then
+                    if (typeof then === 'function') {
+                        then.call(x, y => {
+                            if (called) return
+                            called = true
+                            resolvePromise(promise2, y, resolve, reject)
+                        }, reason => {
+                            if (called) return
+                            called = true
+                            reject(reason)
+                        })
+                    } else {
+                        resolve(x)
+                    }
+                } catch (err) {
+                    if (called) return
+                    called = true
+                    reject(err)
+                }
+            } else {
+                resolve(x)
+            }
+        }
+
+        const p = new HYPromise((resolve, reject) => {
+            // resolve({
+            //     then(resolve) {
+            //         resolve("666")
+            //     }
+            // })
+            resolve("res")
+        })
+
+        const p2 = p.then(res => {
+            // console.log(res);
+            return new HYPromise((resolve, reject) => {
+                reject("i am a error")
+            })
+        }).then(res => {})
+        setTimeout(() => {
+            console.log(p2);
+        },1000);
+
+
+    </script>
+</body>
+
+</html>
